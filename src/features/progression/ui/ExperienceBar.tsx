@@ -9,12 +9,12 @@ export function ExperienceBar({ doc }: { doc: GameDoc }) {
       <div className="xp-track">
         <i
           style={{
-            width: `${Math.min(100, (doc.xp / xpRequired(doc.level)) * 100)}%`,
+            width: `${Math.min(100, (doc.xp / xpRequired(doc.level, doc)) * 100)}%`,
           }}
         />
       </div>
       <span className="mono">
-        {doc.xp} / {xpRequired(doc.level)} XP
+        {doc.xp} / {xpRequired(doc.level, doc)} XP
       </span>
     </div>
   );

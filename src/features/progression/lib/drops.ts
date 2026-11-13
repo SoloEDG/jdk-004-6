@@ -1,34 +1,36 @@
 import type { GameDoc, FrameEvents } from "../../../shared/types";
 import { random, distance, normalize } from "../../../shared/math";
 import { grantExperience } from "./experience";
+
 export function generateDrops(doc: GameDoc, events: FrameEvents): void {
+  const { drops } = doc.rules;
   for (const { enemy } of events.kills) {
     doc.drops.push({
       id: doc.nextId++,
       x: enemy.x,
       y: enemy.y,
       kind: "xp",
-      value: enemy.kind === "elite" ? 10 : enemy.kind === "shooter" ? 3 : 2,
-      life: 45,
+      value: drops.xp[enemy.kind],
+      life: drops.dropLife,
     });
     const roll = random(doc);
-    if (roll < 0.055)
+    if (roll < drops.healChance)
       doc.drops.push({
         id: doc.nextId++,
         x: enemy.x + 8,
         y: enemy.y,
         kind: "heal",
-        value: 18,
-        life: 20,
+        value: drops.healValue,
+        life: drops.healLife,
       });
-    else if (roll < 0.07)
+    else if (roll < drops.healChance + drops.magnetChance)
       doc.drops.push({
         id: doc.nextId++,
         x: enemy.x - 8,
         y: enemy.y,
         kind: "magnet",
         value: 1,
-        life: 20,
+        life: drops.magnetLife,
       });
   }
 }
@@ -37,7 +39,9 @@ export function collectDrops(
   events: FrameEvents,
   dt: number,
 ): void {
-  const radius = 65 + (doc.upgrades.magnet || 0) * 35;
+  const radius =
+    doc.rules.drops.pickupRadius +
+    (doc.upgrades.magnet || 0) * doc.rules.drops.magnetRangeExtra;
   let magnet = false;
   for (const drop of doc.drops) {
     drop.life -= dt;

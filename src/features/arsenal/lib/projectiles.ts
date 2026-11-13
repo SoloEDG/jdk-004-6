@@ -1,4 +1,6 @@
 import type { GameDoc, WeaponId, Vec } from "../../../shared/types";
+
+/** Spawn a projectile. Radius and lifetime come from the pinned weapon rules. */
 export function fire(
   doc: GameDoc,
   weapon: WeaponId,
@@ -8,15 +10,16 @@ export function fire(
   pierce: number,
   origin: Vec = doc.player,
 ): void {
+  const spec = doc.rules.weapons[weapon];
   doc.bullets.push({
     id: doc.nextId++,
     x: origin.x,
     y: origin.y,
     vx: Math.cos(angle) * speed,
     vy: Math.sin(angle) * speed,
-    radius: weapon === "nova" ? 6 : 4,
+    radius: spec.projectileRadius,
     damage,
-    life: weapon === "orbit" ? 1.25 : 2.1,
+    life: spec.projectileLife,
     owner: "player",
     weapon,
     pierce,

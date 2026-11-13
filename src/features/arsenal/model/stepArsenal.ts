@@ -1,6 +1,6 @@
-import type { GameDoc, Input } from "../../../shared/types";
+import type { GameDoc, Input, WeaponId } from "../../../shared/types";
 import { fire, nearestTarget } from "../lib/projectiles";
-import { WEAPON_CATALOG } from "./catalog";
+
 export function stepArsenal(doc: GameDoc, input: Input, dt: number): number {
   let shots = 0;
   const target = nearestTarget(doc),
@@ -9,18 +9,15 @@ export function stepArsenal(doc: GameDoc, input: Input, dt: number): number {
   const power = 1 + (doc.upgrades.power || 0) * 0.2,
     haste = 1 + (doc.upgrades.haste || 0) * 0.13;
   for (const weapon of doc.weapons) {
+    const spec = doc.rules.weapons[weapon.id];
     weapon.cooldown -= dt;
     if (weapon.cooldown > 0) continue;
     weapon.cooldown = Math.max(
       0.08,
-      WEAPON_CATALOG[weapon.id].interval /
-        haste /
-        (1 + (weapon.level - 1) * 0.12),
+      spec.interval / haste / (1 + (weapon.level - 1) * 0.12),
     );
     const damage =
-      (weapon.id === "pulse" ? 16 : weapon.id === "orbit" ? 13 : 12) *
-      power *
-      (1 + (weapon.level - 1) * 0.3);
+      spec.baseDamage * power * (1 + (weapon.level - 1) * 0.3);
     if (weapon.id === "pulse") {
       const count = weapon.level >= 4 ? 3 : weapon.level >= 2 ? 2 : 1;
       for (let i = 0; i < count; i++) {
@@ -29,8 +26,8 @@ export function stepArsenal(doc: GameDoc, input: Input, dt: number): number {
           "pulse",
           angle + (i - (count - 1) / 2) * 0.12,
           damage,
-          440,
-          doc.upgrades.pierce || 0,
+          spec.projectileSpeed,
+          spec.pierce + (doc.upgrades.pierce || 0),
         );
         shots++;
       }
@@ -43,12 +40,19 @@ export function stepArsenal(doc: GameDoc, input: Input, dt: number): number {
           weapon.id,
           doc.time * 0.8 + (i * Math.PI * 2) / count,
           damage,
-          weapon.id === "orbit" ? 150 : 240,
-          weapon.id === "orbit" ? 3 : 1,
+          spec.projectileSpeed,
+          spec.pierce,
         );
         shots++;
       }
     }
   }
   return shots;
+}
+
+/** Weapons a challenge allows but the run has not unlocked yet. */
+export function lockedWeapons(doc: GameDoc): WeaponId[] {
+  return doc.rules.arsenal.pool.filter(
+    (id) => !doc.weapons.some((w) => w.id === id),
+  );
 }

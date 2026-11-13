@@ -18,5 +18,8 @@ export function makeRecord(doc: GameDoc): RunRecord {
     damage: Math.round(doc.stats.damage),
     weapons: doc.weapons.map((w) => `${w.id}:${w.level}`),
     victory: doc.victory,
+    ...(doc.challenge
+      ? { challengeCode: doc.challenge.code }
+      : {}),
   };
 }

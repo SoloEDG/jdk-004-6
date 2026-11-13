@@ -1,21 +1,29 @@
 import type { GameDoc, Enemy } from "../../../shared/types";
-import { WIDTH, HEIGHT } from "../../../shared/types";
 import { random } from "../../../shared/math";
-import { ENEMY_CATALOG } from "../model/catalog";
+
+/**
+ * Spawn one enemy using the run's pinned ruleset. Composition thresholds and
+ * the hp/speed scaling are all challenge-constrained, so the same seed produces
+ * the same enemy tide on every machine.
+ */
 export function spawnEnemy(doc: GameDoc): Enemy {
+  const { waves: w, enemies: table, arena } = doc.rules;
   const roll = random(doc);
   const kind: Enemy["kind"] =
-    doc.wave >= 3 && roll < 0.08
+    doc.wave >= w.eliteWave && roll < w.eliteChance
       ? "elite"
-      : doc.wave >= 2 && roll < 0.28
+      : doc.wave >= w.shooterWave && roll < w.shooterChance
         ? "shooter"
         : "chaser";
-  const data = ENEMY_CATALOG[kind],
-    side = Math.floor(random(doc) * 4),
-    along = random(doc);
-  const x = side === 0 ? -28 : side === 1 ? WIDTH + 28 : along * WIDTH;
-  const y = side === 2 ? -28 : side === 3 ? HEIGHT + 28 : along * HEIGHT;
-  const hp = Math.round(data.hp * (1 + (doc.wave - 1) * 0.22));
+  const data = table[kind];
+  const side = Math.floor(random(doc) * 4);
+  const along = random(doc);
+  const offset = w.spawnOffset;
+  const x =
+    side === 0 ? -offset : side === 1 ? arena.width + offset : along * arena.width;
+  const y =
+    side === 2 ? -offset : side === 3 ? arena.height + offset : along * arena.height;
+  const hp = Math.round(data.hp * (1 + (doc.wave - 1) * w.hpScalePerWave));
   return {
     id: doc.nextId++,
     kind,

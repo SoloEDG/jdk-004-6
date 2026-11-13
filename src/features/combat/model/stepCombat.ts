@@ -1,8 +1,11 @@
 import type { GameDoc, Input, FrameEvents } from "../../../shared/types";
-import { WIDTH, HEIGHT } from "../../../shared/types";
 import { clamp, distance, normalize } from "../../../shared/math";
 import { segmentDistance } from "../lib/collision";
 import { hurtPlayer } from "./health";
+
+/** How far off-field a projectile may drift before being recycled. */
+const BULLET_CULL_MARGIN = 120;
+
 export function stepCombat(
   doc: GameDoc,
   input: Input,
@@ -16,6 +19,7 @@ export function stepCombat(
     collected: 0,
     weaponDamage: {},
   };
+  const { arena } = doc.rules;
   const player = doc.player;
   player.invincible = Math.max(0, player.invincible - dt);
   const direction = normalize(input.x, input.y),
@@ -23,12 +27,12 @@ export function stepCombat(
   player.x = clamp(
     player.x + direction.x * strength * player.speed * dt,
     player.radius,
-    WIDTH - player.radius,
+    arena.width - player.radius,
   );
   player.y = clamp(
     player.y + direction.y * strength * player.speed * dt,
     player.radius,
-    HEIGHT - player.radius,
+    arena.height - player.radius,
   );
   for (const bullet of doc.bullets) {
     const previous = { x: bullet.x, y: bullet.y };
@@ -74,16 +78,19 @@ export function stepCombat(
   }
   for (const enemy of doc.enemies) {
     if (enemy.hp > 0 && distance(enemy, player) < enemy.radius + player.radius)
-      events.taken += hurtPlayer(doc, enemy.kind === "elite" ? 25 : 12);
+      events.taken += hurtPlayer(
+        doc,
+        doc.rules.enemies[enemy.kind].contactDamage,
+      );
   }
   doc.enemies = doc.enemies.filter((e) => e.hp > 0);
   doc.bullets = doc.bullets.filter(
     (b) =>
       b.life >= 0 &&
-      b.x > -120 &&
-      b.x < WIDTH + 120 &&
-      b.y > -120 &&
-      b.y < HEIGHT + 120,
+      b.x > -BULLET_CULL_MARGIN &&
+      b.x < arena.width + BULLET_CULL_MARGIN &&
+      b.y > -BULLET_CULL_MARGIN &&
+      b.y < arena.height + BULLET_CULL_MARGIN,
   );
   return events;
 }

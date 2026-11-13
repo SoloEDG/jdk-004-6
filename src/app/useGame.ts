@@ -1,11 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import { createRun } from "../shared/createRun";
-import type { Input } from "../shared/types";
+import type { ChallengeConfig, GameDoc, Input } from "../shared/types";
 import { simulate } from "./simulate";
 import { chooseUpgrade } from "../features/progression";
 import { loadRecords, saveRecords } from "../features/results";
+import {
+  createChallengeRun,
+  decodeChallenge,
+} from "../features/challenges";
+
+export interface ChallengeNotice {
+  kind: "ok" | "corrupt" | "unsupported";
+  text: string;
+}
+
+const FREE_SEED = 204004;
+
 export function useGame() {
-  const game = useRef(createRun(204004, loadRecords()));
+  const game = useRef<GameDoc>(createRun({ seed: FREE_SEED, records: loadRecords() }));
   const input = useRef<Input>({
     x: 0,
     y: 0,
@@ -14,6 +26,26 @@ export function useGame() {
   });
   const keys = useRef(new Set<string>());
   const [, render] = useState(0);
+  const [notice, setNotice] = useState<ChallengeNotice | null>(null);
+  const rerender = () => render((n) => n + 1);
+
+  /**
+   * Start a brand-new isolated run for a validated challenge. A new doc is always
+   * constructed, so re-loading the same code never carries over the previous
+   * run's upgrades, weapons or stats.
+   */
+  const launchChallenge = (challenge: ChallengeConfig) => {
+    saveRecords(game.current.records);
+    game.current = createChallengeRun(challenge, game.current.records);
+    keys.current.clear();
+    input.current.firing = false;
+    setNotice({
+      kind: "ok",
+      text: `已接入挑战「${challenge.title}」，规则版本 v${challenge.rulesVersion} 已固定`,
+    });
+    rerender();
+  };
+
   useEffect(() => {
     let raf = 0,
       last = 0,
@@ -80,9 +112,12 @@ export function useGame() {
       document.removeEventListener("visibilitychange", hidden);
     };
   }, []);
+
   return {
     game,
     input,
+    notice,
+    clearNotice: () => setNotice(null),
     start: () => {
       game.current.phase = "playing";
     },
@@ -92,10 +127,43 @@ export function useGame() {
       else if (d.phase === "paused") d.phase = "playing";
     },
     choose: (id: string) => chooseUpgrade(game.current, id),
-    restart: () => {
+    /** Launch an already-validated challenge (daily generation or terminal preview). */
+    launch: (challenge: ChallengeConfig) => launchChallenge(challenge),
+    /**
+     * Import a share code. On any failure the current run is left completely
+     * untouched and the caller receives the precise reason; only an "ok" decode
+     * replaces the active run.
+     */
+    importCode: (raw: string): ChallengeNotice => {
+      const result = decodeChallenge(raw);
+      if (result.status !== "ok") {
+        const message: ChallengeNotice = {
+          kind: result.status,
+          text: result.reason,
+        };
+        setNotice(message);
+        return message;
+      }
+      launchChallenge(result.challenge);
+      return { kind: "ok", text: "挑战码已通过校验并接入" };
+    },
+    /** Return to the untethered free-play run. */
+    startFree: () => {
       saveRecords(game.current.records);
-      game.current = createRun(204004, game.current.records);
+      game.current = createRun({ seed: FREE_SEED, records: game.current.records });
       keys.current.clear();
+      input.current.firing = false;
+      setNotice({ kind: "ok", text: "已返回自由行动（默认规则）" });
+      rerender();
+    },
+    restart: () => {
+      const previous = game.current;
+      saveRecords(previous.records);
+      game.current = previous.challenge
+        ? createChallengeRun(previous.challenge, previous.records)
+        : createRun({ seed: FREE_SEED, records: previous.records });
+      keys.current.clear();
+      input.current.firing = false;
       game.current.phase = "playing";
     },
   };

@@ -1,3 +1,5 @@
+import type { RulesetV1, EnemyKindId } from "./rules";
+
 export type Vec = { x: number; y: number };
 export type Phase = "ready" | "playing" | "paused" | "upgrade" | "ended";
 export type WeaponId = "pulse" | "orbit" | "nova";
@@ -10,7 +12,7 @@ export interface Player extends Vec {
 }
 export interface Enemy extends Vec {
   id: number;
-  kind: "chaser" | "shooter" | "elite";
+  kind: EnemyKindId;
   hp: number;
   maxHp: number;
   radius: number;
@@ -63,7 +65,63 @@ export interface RunRecord {
   damage: number;
   weapons: string[];
   victory: boolean;
+  /** Challenge code when this record came from a shared challenge. */
+  challengeCode?: string;
 }
+
+/**
+ * Immutable constraints of a shared daily challenge. Every field changes the
+ * resolved ruleset, so two challenges cannot differ by title alone. The resolved
+ * ruleset is derived from these constraints at load time and validated against
+ * the pinned rulesVersion.
+ */
+export interface ChallengeConfig {
+  /** Calendar day the challenge belongs to, local date formatted YYYY-MM-DD. */
+  date: string;
+  /** Public short code chosen by the sender; feeds the deterministic seed. */
+  code: string;
+  /** Pinned ruleset version — never replaced by the client's current balance. */
+  rulesVersion: 1;
+  seed: number;
+  title: string;
+  constraints: ChallengeConstraints;
+}
+
+export interface ChallengeConstraints {
+  totalWaves: number;
+  waveDuration: number;
+  weaponPool: WeaponId[];
+  /** Upgrade ids that may be offered during the run. */
+  allowedUpgrades: string[];
+  healChance: number;
+  magnetChance: number;
+  arenaWidth: number;
+  arenaHeight: number;
+}
+
+/** Snapshot summary emitted at run end, used for friend-side verification. */
+export interface ChallengeSummary {
+  outcome: "victory" | "defeat";
+  time: number;
+  wave: number;
+  level: number;
+  kills: number;
+  damage: number;
+  taken: number;
+  collected: number;
+  shots: number;
+  byWeapon: Record<WeaponId, number>;
+  weapons: string[];
+}
+
+/** Exportable artifact: the original challenge plus a self-describing result. */
+export interface ChallengeResult {
+  artifact: "void-signal.challenge-result";
+  formatVersion: 1;
+  challenge: ChallengeConfig;
+  summary: ChallengeSummary;
+}
+
 export interface GameDoc {
   version: 1;
   seed: number;
@@ -88,6 +146,10 @@ export interface GameDoc {
   records: RunRecord[];
   notice: string;
   victory: boolean;
+  /** Resolved immutable balance snapshot this run is simulated against. */
+  rules: RulesetV1;
+  /** Present only when this run is a shared daily challenge. */
+  challenge?: ChallengeConfig;
 }
 export interface Input {
   x: number;
@@ -107,5 +169,3 @@ export interface FrameEvents {
   shots: number;
   collected: number;
 }
-export const WIDTH = 1000;
-export const HEIGHT = 650;

@@ -3,9 +3,13 @@ import { formatTime } from "../../../shared/math";
 export function ResultDialog({
   doc,
   restart,
+  onExport,
+  exported,
 }: {
   doc: GameDoc;
   restart: () => void;
+  onExport?: () => void;
+  exported?: boolean;
 }) {
   return (
     <div className="overlay">
@@ -14,7 +18,11 @@ export function ResultDialog({
           MISSION {doc.victory ? "COMPLETE" : "ENDED"}
         </div>
         <h2>{doc.victory ? "信号已送达。" : "信号暂时中断。"}</h2>
-        <p>每一次坠落，都是下一次进化的起点。</p>
+        <p>
+          {doc.challenge
+            ? `每日挑战 ${doc.challenge.date} · 规则 v${doc.challenge.rulesVersion}，结果可导出供好友本地复核。`
+            : "每一次坠落，都是下一次进化的起点。"}
+        </p>
         <div className="result-grid">
           <div>
             <strong>{formatTime(doc.time)}</strong>
@@ -37,9 +45,16 @@ export function ResultDialog({
             </div>
           ))}
         </div>
-        <button className="primary" onClick={restart}>
-          重新接入 ↗
-        </button>
+        <div className="result-actions">
+          <button className="primary" onClick={restart}>
+            重新接入 ↗
+          </button>
+          {doc.challenge && onExport && (
+            <button className="outline" onClick={onExport} disabled={exported}>
+              {exported ? "结果已导出 ✓" : "导出复核结果 JSON"}
+            </button>
+          )}
+        </div>
         <p className="tiny">本地已记录 {doc.records.length} 次行动</p>
       </div>
     </div>

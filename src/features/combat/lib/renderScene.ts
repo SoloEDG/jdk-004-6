@@ -1,31 +1,34 @@
 import type { GameDoc } from "../../../shared/types";
-import { WIDTH, HEIGHT } from "../../../shared/types";
+
+/** Render the field using the run's pinned arena dimensions, not module constants. */
 export function renderScene(ctx: CanvasRenderingContext2D, d: GameDoc) {
-  ctx.clearRect(0, 0, WIDTH, HEIGHT);
+  const width = d.rules.arena.width;
+  const height = d.rules.arena.height;
+  ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = "#0a1019";
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  ctx.fillRect(0, 0, width, height);
   ctx.strokeStyle = "#172431";
   ctx.lineWidth = 0.6;
-  for (let x = 0; x < WIDTH; x += 40) {
+  for (let x = 0; x < width; x += 40) {
     ctx.beginPath();
     ctx.moveTo(x, 0);
-    ctx.lineTo(x, HEIGHT);
+    ctx.lineTo(x, height);
     ctx.stroke();
   }
-  for (let y = 0; y < HEIGHT; y += 40) {
+  for (let y = 0; y < height; y += 40) {
     ctx.beginPath();
     ctx.moveTo(0, y);
-    ctx.lineTo(WIDTH, y);
+    ctx.lineTo(width, y);
     ctx.stroke();
   }
   ctx.strokeStyle = "#2d424d";
   ctx.setLineDash([6, 8]);
-  ctx.strokeRect(28, 28, WIDTH - 56, HEIGHT - 56);
+  ctx.strokeRect(28, 28, width - 56, height - 56);
   ctx.setLineDash([]);
   ctx.strokeStyle = "#152c35";
   for (const r of [110, 220, 330]) {
     ctx.beginPath();
-    ctx.arc(500, 325, r, 0, Math.PI * 2);
+    ctx.arc(width / 2, height / 2, r, 0, Math.PI * 2);
     ctx.stroke();
   }
   for (const drop of d.drops) {
@@ -115,10 +118,10 @@ export function renderScene(ctx: CanvasRenderingContext2D, d: GameDoc) {
   ctx.restore();
   ctx.fillStyle = "#526571";
   ctx.font = "10px monospace";
-  ctx.fillText("SECTOR 07 / SIGNAL ACTIVE", 48, HEIGHT - 42);
+  ctx.fillText("SECTOR 07 / SIGNAL ACTIVE", 48, height - 42);
   ctx.fillText(
     `${d.enemies.length.toString().padStart(3, "0")} HOSTILES`,
-    WIDTH - 145,
-    HEIGHT - 42,
+    width - 145,
+    height - 42,
   );
 }

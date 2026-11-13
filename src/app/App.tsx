@@ -10,6 +10,8 @@ import {
   History,
   Volume2,
   VolumeX,
+  AlertTriangle,
+  CheckCircle2,
 } from "lucide-react";
 import { useGame } from "./useGame";
 import { Battlefield, Vitals } from "../features/combat";
@@ -17,17 +19,45 @@ import { WavePanel } from "../features/waves";
 import { ArsenalPanel } from "../features/arsenal";
 import { UpgradeDialog, ExperienceBar } from "../features/progression";
 import { StatsPanel, ResultDialog, HistoryPanel } from "../features/results";
+import { ChallengeTerminal, ChallengePanel } from "../features/challenges";
+import { buildChallengeResult } from "../features/challenges/lib/results";
+import { downloadResult } from "../features/challenges/lib/export";
 import { formatTime } from "../shared/math";
 import { useAudio } from "./useAudio";
 export function App() {
-  const { game, input, start, toggle, choose, restart } = useGame();
+  const {
+    game,
+    input,
+    start,
+    toggle,
+    choose,
+    restart,
+    importCode,
+    launch,
+    startFree,
+    notice,
+    clearNotice,
+  } = useGame();
   const d = game.current;
   const [history, setHistory] = useState(false);
   const [help, setHelp] = useState(false);
+  const [terminal, setTerminal] = useState(false);
+  const [exported, setExported] = useState(false);
   const { muted, setMuted } = useAudio(d);
   const openHistory = () => {
     if (d.phase === "playing") d.phase = "paused";
     setHistory(true);
+  };
+  const openTerminal = () => {
+    if (d.phase === "playing") d.phase = "paused";
+    clearNotice();
+    setTerminal(true);
+  };
+  const handleExport = () => {
+    const result = buildChallengeResult(d);
+    if (!result) return;
+    downloadResult(result);
+    setExported(true);
   };
   return (
     <div className="app-shell">
@@ -44,6 +74,9 @@ export function App() {
           <span className="nav-active">
             <Crosshair size={15} /> 生存行动
           </span>
+          <button onClick={openTerminal}>
+            <Radio size={15} /> 每日挑战
+          </button>
           <button onClick={openHistory}>
             <History size={15} /> 行动档案
           </button>
@@ -54,6 +87,17 @@ export function App() {
         </div>
       </header>
       <main>
+        {notice && (
+          <div className={`challenge-banner ${notice.kind}`}>
+            {notice.kind === "ok" ? (
+              <CheckCircle2 size={15} />
+            ) : (
+              <AlertTriangle size={15} />
+            )}
+            <span>{notice.text}</span>
+            <button onClick={clearNotice}>✕</button>
+          </div>
+        )}
         <div className="page-heading">
           <div>
             <div className="eyebrow">OPERATIONS / SECTOR 07</div>
@@ -86,10 +130,12 @@ export function App() {
             </div>
             <Vitals doc={d} />
             <WavePanel doc={d} />
+            <ChallengePanel doc={d} onOpen={openTerminal} />
             <div className="mission-note">
               <Radio size={18} />
               <span>
-                目标：存活 04:00
+                目标：存活{" "}
+                {formatTime(d.rules.waves.totalWaves * d.rules.waves.duration)}
                 <br />
                 <small>穿越敌潮，等待撤离窗口。</small>
               </span>
@@ -142,6 +188,7 @@ export function App() {
                   onClick={() => {
                     if (d.phase === "playing") d.phase = "paused";
                     setHelp(false);
+                    setExported(false);
                     restart();
                   }}
                 >
@@ -161,11 +208,15 @@ export function App() {
                       <Crosshair size={44} />
                     </div>
                     <div className="eyebrow">CONNECTION ESTABLISHED</div>
-                    <h2>准备好迎接敌潮了吗？</h2>
+                    <h2>
+                      {d.challenge
+                        ? `每日挑战 · ${d.challenge.date}`
+                        : "准备好迎接敌潮了吗？"}
+                    </h2>
                     <p>
-                      移动，躲避，进化。
-                      <br />
-                      武器将自动开火，你只需要活下去。
+                      {d.challenge
+                        ? "规则版本与种子已固定，敌潮、强化与掉落和分享码完全一致。"
+                        : "移动，躲避，进化。武器自动开火，你只需要活下去。"}
                     </p>
                     <button className="primary" onClick={start}>
                       开始行动 <ArrowUpRight size={17} />
@@ -174,7 +225,7 @@ export function App() {
                   </div>
                 </div>
               )}
-              {d.phase === "paused" && !history && !help && (
+              {d.phase === "paused" && !history && !help && !terminal && (
                 <div className="overlay">
                   <div className="pause-card">
                     <Pause size={32} />
@@ -190,7 +241,15 @@ export function App() {
                 <UpgradeDialog doc={d} choose={choose} />
               )}{" "}
               {d.phase === "ended" && (
-                <ResultDialog doc={d} restart={restart} />
+                <ResultDialog
+                  doc={d}
+                  restart={() => {
+                    setExported(false);
+                    restart();
+                  }}
+                  onExport={handleExport}
+                  exported={exported}
+                />
               )}
             </div>
             <ExperienceBar doc={d} />
@@ -233,6 +292,19 @@ export function App() {
       {history && (
         <HistoryPanel records={d.records} close={() => setHistory(false)} />
       )}{" "}
+      {terminal && (
+        <ChallengeTerminal
+          onClose={() => setTerminal(false)}
+          onLaunch={(challenge) => {
+            launch(challenge);
+            setExported(false);
+            setTerminal(false);
+          }}
+          onImportError={importCode}
+          onFreePlay={startFree}
+          currentChallenge={d.challenge}
+        />
+      )}
       {help && (
         <div className="overlay help-overlay">
           <div className="history-dialog">
@@ -252,8 +324,12 @@ export function App() {
               升级时选择一种武器或强化。脉冲、轨道刃、新星可以同时装备，被动强化对所有武器生效。
             </p>
             <p>
+              每日挑战由日期与挑战码生成，并固定规则版本；导入损坏挑战码不会打断当前行动，
+              重复加载会从零开始、不继承上一局强化。
+            </p>
+            <p>
               ESC / P
-              暂停。切换窗口自动暂停。八波共四分钟，完成后自动记录本局统计。
+              暂停。切换窗口自动暂停。完成全部波次后自动记录本局统计，并可导出复核结果。
             </p>
             <button className="primary" onClick={() => setHelp(false)}>
               已了解

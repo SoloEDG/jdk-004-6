@@ -7,6 +7,6 @@ export function hurtPlayer(doc: GameDoc, damage: number): number {
     Math.max(1, damage * (1 - armor * 0.12)),
   );
   doc.player.hp -= taken;
-  doc.player.invincible = 0.65;
+  doc.player.invincible = doc.rules.player.invincibility;
   return taken;
 }

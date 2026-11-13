@@ -1,5 +1,29 @@
-import type { GameDoc, RunRecord } from "./types";
-export function createRun(seed = 204004, records: RunRecord[] = []): GameDoc {
+import type { GameDoc, RunRecord, ChallengeConfig } from "./types";
+import { DEFAULT_RULES_V1, cloneRuleset } from "./rules";
+import type { RulesetV1 } from "./rules";
+import { deriveRuleset } from "../features/challenges/lib/config";
+
+export interface CreateRunOptions {
+  seed?: number;
+  records?: RunRecord[];
+  rules?: RulesetV1;
+  challenge?: ChallengeConfig;
+}
+
+/**
+ * Build a fresh run. Challenge runs resolve their own pinned ruleset so the
+ * simulation is tied to the challenge's rulesVersion rather than the client's
+ * current balance.
+ */
+export function createRun(options: CreateRunOptions = {}): GameDoc {
+  const {
+    seed = 204004,
+    records = [],
+    challenge,
+    rules = challenge
+      ? deriveRuleset(challenge)
+      : cloneRuleset(DEFAULT_RULES_V1),
+  } = options;
   return {
     version: 1,
     seed,
@@ -8,12 +32,12 @@ export function createRun(seed = 204004, records: RunRecord[] = []): GameDoc {
     phase: "ready",
     time: 0,
     player: {
-      x: 500,
-      y: 325,
-      hp: 100,
-      maxHp: 100,
-      speed: 190,
-      radius: 12,
+      x: rules.player.startX,
+      y: rules.player.startY,
+      hp: rules.player.hp,
+      maxHp: rules.player.hp,
+      speed: rules.player.speed,
+      radius: rules.player.radius,
       invincible: 0,
     },
     enemies: [],
@@ -37,7 +61,11 @@ export function createRun(seed = 204004, records: RunRecord[] = []): GameDoc {
       byWeapon: { pulse: 0, orbit: 0, nova: 0 },
     },
     records,
-    notice: "等待接入战场",
+    notice: challenge
+      ? `每日挑战 · ${challenge.date}`
+      : "等待接入战场",
     victory: false,
+    rules,
+    challenge,
   };
 }

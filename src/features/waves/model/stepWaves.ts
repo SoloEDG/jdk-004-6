@@ -1,8 +1,9 @@
 import type { GameDoc } from "../../../shared/types";
 import { distance, normalize } from "../../../shared/math";
 import { spawnEnemy } from "../lib/spawn";
-import { ENEMY_CATALOG, WAVE_DURATION, TOTAL_WAVES } from "./catalog";
+
 export function stepWaves(doc: GameDoc, dt: number): void {
+  const { waves } = doc.rules;
   if (doc.victory) return;
   if (doc.wave === 0) {
     doc.wave = 1;
@@ -10,9 +11,9 @@ export function stepWaves(doc: GameDoc, dt: number): void {
     doc.notice = "第 1 波 · 信号已连接";
   }
   doc.waveTime += dt;
-  while (doc.waveTime >= WAVE_DURATION) {
-    doc.waveTime -= WAVE_DURATION;
-    if (doc.wave >= TOTAL_WAVES) {
+  while (doc.waveTime >= waves.duration) {
+    doc.waveTime -= waves.duration;
+    if (doc.wave >= waves.totalWaves) {
       doc.victory = true;
       doc.notice = "全部波次已清除";
       return;
@@ -20,34 +21,37 @@ export function stepWaves(doc: GameDoc, dt: number): void {
     doc.wave++;
     doc.notice = `第 ${doc.wave} 波 · 威胁升级`;
   }
-  doc.spawnBudget += dt * (1.05 + doc.wave * 0.27);
+  doc.spawnBudget +=
+    dt * (waves.spawnBase + doc.wave * waves.spawnPerWave) * waves.spawnMultiplier;
   while (doc.spawnBudget >= 1) {
     doc.spawnBudget--;
-    if (doc.enemies.length < 180) doc.enemies.push(spawnEnemy(doc));
+    if (doc.enemies.length < waves.maxEnemies) doc.enemies.push(spawnEnemy(doc));
   }
   for (const enemy of doc.enemies) {
     const toward = normalize(doc.player.x - enemy.x, doc.player.y - enemy.y),
       range = distance(enemy, doc.player);
     const standOff =
       enemy.kind === "shooter" ? (range < 170 ? -1 : range < 245 ? 0 : 1) : 1;
-    const speed = ENEMY_CATALOG[enemy.kind].speed * (1 + doc.wave * 0.035);
+    const speed =
+      doc.rules.enemies[enemy.kind].speed *
+      (1 + doc.wave * waves.speedScalePerWave);
     enemy.x += toward.x * speed * standOff * dt;
     enemy.y += toward.y * speed * standOff * dt;
     enemy.cooldown -= dt;
+    const kindRules = doc.rules.enemies[enemy.kind];
     if (enemy.kind !== "chaser" && enemy.cooldown <= 0) {
-      enemy.cooldown = enemy.kind === "elite" ? 1.8 : 2.6;
-      const angle = Math.atan2(toward.y, toward.x),
-        spread = enemy.kind === "elite" ? [-0.24, 0, 0.24] : [0];
-      for (const offset of spread) {
+      enemy.cooldown = kindRules.shootCooldown;
+      const angle = Math.atan2(toward.y, toward.x);
+      for (const offset of kindRules.spread) {
         doc.bullets.push({
           id: doc.nextId++,
           x: enemy.x,
           y: enemy.y,
-          vx: Math.cos(angle + offset) * 160,
-          vy: Math.sin(angle + offset) * 160,
-          radius: 5,
-          damage: enemy.kind === "elite" ? 16 : 10,
-          life: 5,
+          vx: Math.cos(angle + offset) * kindRules.bulletSpeed,
+          vy: Math.sin(angle + offset) * kindRules.bulletSpeed,
+          radius: kindRules.bulletRadius,
+          damage: kindRules.bulletDamage,
+          life: kindRules.bulletLife,
           owner: "enemy",
           weapon: "enemy",
           pierce: 0,
